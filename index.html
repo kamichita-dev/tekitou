@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>眠れない夜</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: #020510;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Noto Serif JP', serif;
+  }
+
+  canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+
+  .text-wrapper {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+    animation: fadeIn 3s ease forwards;
+  }
+
+  h1 {
+    font-size: clamp(2.5rem, 8vw, 6rem);
+    font-weight: 300;
+    color: #e8e0f0;
+    letter-spacing: 0.3em;
+    text-shadow:
+      0 0 40px rgba(150, 120, 255, 0.6),
+      0 0 80px rgba(100, 80, 200, 0.3),
+      0 2px 4px rgba(0,0,0,0.8);
+    position: relative;
+  }
+
+  h1::after {
+    content: '眠れない夜';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    color: transparent;
+    background: linear-gradient(135deg, #c8b8ff, #ffe0f0, #b8d4ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    filter: blur(8px);
+    opacity: 0.5;
+    z-index: -1;
+  }
+
+  .subtitle {
+    margin-top: 1.2rem;
+    font-size: clamp(0.7rem, 2vw, 1rem);
+    font-weight: 300;
+    color: rgba(200, 190, 220, 0.5);
+    letter-spacing: 0.6em;
+  }
+
+  @keyframes fadeIn {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  .overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: radial-gradient(ellipse at 50% 60%, transparent 30%, rgba(2, 5, 16, 0.6) 100%);
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .fog {
+    position: fixed;
+    bottom: 0; left: 0;
+    width: 100%; height: 35%;
+    background: linear-gradient(to top, rgba(2, 5, 16, 0.5), transparent);
+    z-index: 3;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="city"></canvas>
+<div class="overlay"></div>
+<div class="fog"></div>
+
+<div class="text-wrapper">
+  <h1>眠れない夜</h1>
+  <h1>そんな悩みも解決しますあつあげZ</h1>
+  <p class="subtitle" id="clock">Tokyo 00:00</p>
+</div>
+
+<script>
+// Live clock
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const s = String(now.getSeconds()).padStart(2, '0');
+  document.getElementById('clock').textContent = `Tokyo  ${h}:${m}:${s}`;
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+const canvas = document.getElementById('city');
+const ctx = canvas.getContext('2d');
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+window.addEventListener('resize', () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  drawCity();
+});
+
+// Stars
+const stars = Array.from({length: 200}, () => ({
+  x: Math.random() * canvas.width,
+  y: Math.random() * canvas.height * 0.55,
+  r: Math.random() * 1.2,
+  a: Math.random(),
+  speed: 0.003 + Math.random() * 0.007
+}));
+
+// Building generator
+function generateBuildings() {
+  const buildings = [];
+  const w = canvas.width;
+  const h = canvas.height;
+  const groundY = h * 0.72;
+
+  // Background layer (far)
+  let x = 0;
+  while (x < w) {
+    const bw = 18 + Math.random() * 30;
+    const bh = 40 + Math.random() * 100;
+    buildings.push({ x, y: groundY - bh, w: bw, h: bh, layer: 0 });
+    x += bw + 1 + Math.random() * 3;
+  }
+
+  // Mid layer
+  x = -10;
+  while (x < w + 20) {
+    const bw = 25 + Math.random() * 50;
+    const bh = 80 + Math.random() * 180;
+    buildings.push({ x, y: groundY - bh, w: bw, h: bh, layer: 1 });
+    x += bw + 2 + Math.random() * 8;
+  }
+
+  // Foreground layer
+  x = -20;
+  while (x < w + 40) {
+    const bw = 40 + Math.random() * 70;
+    const bh = 60 + Math.random() * 120;
+    buildings.push({ x, y: groundY - bh, w: bw, h: bh, layer: 2 });
+    x += bw + 3 + Math.random() * 12;
+  }
+
+  return buildings;
+}
+
+// Window lights
+function generateWindows(buildings) {
+  const lights = [];
+  buildings.forEach(b => {
+    const cols = Math.floor(b.w / 8);
+    const rows = Math.floor(b.h / 10);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (Math.random() < 0.35) {
+          const colors = ['#fff9e0', '#ffe8a0', '#e0f0ff', '#ffd0e8', '#d0e8ff', '#ffffff'];
+          lights.push({
+            x: b.x + 3 + c * 8 + Math.random() * 2,
+            y: b.y + 4 + r * 10,
+            w: 3 + Math.random() * 2,
+            h: 4 + Math.random() * 2,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            blink: Math.random() < 0.03,
+            blinkTimer: Math.random() * 100
+          });
+        }
+      }
+    }
+  });
+  return lights;
+}
+
+const buildings = generateBuildings();
+const lights = generateWindows(buildings);
+
+function drawCity() {
+  const w = canvas.width;
+  const h = canvas.height;
+  const groundY = h * 0.72;
+
+  // Sky gradient
+  const sky = ctx.createLinearGradient(0, 0, 0, groundY);
+  sky.addColorStop(0, '#010208');
+  sky.addColorStop(0.3, '#050a1a');
+  sky.addColorStop(0.7, '#0a0820');
+  sky.addColorStop(1, '#12082a');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, w, groundY);
+
+  // City glow on horizon
+  const horizonGlow = ctx.createRadialGradient(w/2, groundY, 0, w/2, groundY, w * 0.7);
+  horizonGlow.addColorStop(0, 'rgba(80, 40, 120, 0.4)');
+  horizonGlow.addColorStop(0.4, 'rgba(40, 20, 80, 0.2)');
+  horizonGlow.addColorStop(1, 'transparent');
+  ctx.fillStyle = horizonGlow;
+  ctx.fillRect(0, groundY - 150, w, 200);
+
+  // Draw stars
+  stars.forEach(s => {
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(220,220,255,${s.a})`;
+    ctx.fill();
+  });
+
+  // Moon
+  const moonX = w * 0.15, moonY = h * 0.12;
+  const moonGlow = ctx.createRadialGradient(moonX, moonY, 0, moonX, moonY, 60);
+  moonGlow.addColorStop(0, 'rgba(200,190,255,0.15)');
+  moonGlow.addColorStop(1, 'transparent');
+  ctx.fillStyle = moonGlow;
+  ctx.beginPath();
+  ctx.arc(moonX, moonY, 60, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(moonX, moonY, 20, 0, Math.PI * 2);
+  ctx.fillStyle = '#e8e0f8';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(moonX + 7, moonY - 4, 16, 0, Math.PI * 2);
+  ctx.fillStyle = '#080615';
+  ctx.fill();
+
+  // Far buildings
+  buildings.filter(b => b.layer === 0).forEach(b => {
+    ctx.fillStyle = '#0a0818';
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+  });
+
+  // Mid buildings
+  buildings.filter(b => b.layer === 1).forEach(b => {
+    const grad = ctx.createLinearGradient(b.x, b.y, b.x + b.w, b.y);
+    grad.addColorStop(0, '#0d0c1e');
+    grad.addColorStop(1, '#080817');
+    ctx.fillStyle = grad;
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+  });
+
+  // Window lights (mid + far)
+  lights.forEach(l => {
+    const alpha = l.blink ? (Math.sin(l.blinkTimer * 0.1) > 0 ? 0.9 : 0.1) : 0.75 + Math.random() * 0.05;
+    ctx.fillStyle = l.color;
+    ctx.globalAlpha = alpha;
+    ctx.fillRect(l.x, l.y, l.w, l.h);
+    // Soft glow
+    ctx.globalAlpha = alpha * 0.3;
+    ctx.fillStyle = l.color;
+    ctx.fillRect(l.x - 1, l.y - 1, l.w + 2, l.h + 2);
+  });
+  ctx.globalAlpha = 1;
+
+  // Foreground buildings
+  buildings.filter(b => b.layer === 2).forEach(b => {
+    ctx.fillStyle = '#06060f';
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+  });
+
+  // Ground / road
+  const road = ctx.createLinearGradient(0, groundY, 0, h);
+  road.addColorStop(0, '#0c0a1a');
+  road.addColorStop(1, '#050510');
+  ctx.fillStyle = road;
+  ctx.fillRect(0, groundY, w, h - groundY);
+
+  // Reflections on ground
+  lights.slice(0, 150).forEach(l => {
+    const ry = groundY + (groundY - l.y) * 0.15;
+    if (ry < h) {
+      ctx.fillStyle = l.color;
+      ctx.globalAlpha = 0.08;
+      ctx.fillRect(l.x, ry, l.w, l.h * 0.5);
+    }
+  });
+  ctx.globalAlpha = 1;
+
+  // Tokyo Tower silhouette
+  drawTokyoTower(w * 0.75, groundY);
+}
+
+function drawTokyoTower(cx, groundY) {
+  ctx.fillStyle = '#1a0010';
+  // Main structure
+  ctx.beginPath();
+  ctx.moveTo(cx, groundY - 200);
+  ctx.lineTo(cx - 18, groundY);
+  ctx.lineTo(cx + 18, groundY);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(cx, groundY - 200);
+  ctx.lineTo(cx - 6, groundY - 220);
+  ctx.lineTo(cx + 6, groundY - 220);
+  ctx.closePath();
+  ctx.fill();
+
+  // Antenna
+  ctx.beginPath();
+  ctx.moveTo(cx, groundY - 220);
+  ctx.lineTo(cx, groundY - 240);
+  ctx.strokeStyle = '#1a0010';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Red lights
+  ctx.beginPath();
+  ctx.arc(cx, groundY - 160, 2.5, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255, 50, 50, 0.9)';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx, groundY - 220, 2, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255, 80, 80, 0.9)';
+  ctx.fill();
+}
+
+let frame = 0;
+function animate() {
+  frame++;
+  drawCity();
+
+  // Animate stars
+  stars.forEach(s => {
+    s.a = 0.3 + 0.7 * Math.abs(Math.sin(frame * s.speed));
+  });
+
+  // Blink some windows
+  lights.forEach(l => {
+    if (l.blink) l.blinkTimer++;
+  });
+
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+</body>
+</html>
